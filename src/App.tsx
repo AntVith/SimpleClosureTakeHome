@@ -1,16 +1,15 @@
-import { useMemo, useState } from 'react'
+import { useMemo } from 'react'
 import Controls from './components/Controls.tsx'
 import MovieGrid from './components/MovieGrid.tsx'
 import Navbar from './components/Navbar.tsx'
 import { useGenres } from './hooks/useGenres.ts'
 import { useMovies } from './hooks/useMovies.ts'
-import type { SortDirection, SortKey } from './lib/sortMovies.ts'
+import { useViewState } from './hooks/useViewState.ts'
 import { sortMovies } from './lib/sortMovies.ts'
 
 function App() {
-  const [genreId, setGenreId] = useState<number | null>(null)
-  const [sortKey, setSortKey] = useState<SortKey>('vote_average')
-  const [direction, setDirection] = useState<SortDirection>('desc')
+  const { state, update } = useViewState()
+  const { genreId, sortKey, direction } = state
 
   const movies = useMovies(genreId)
   const genres = useGenres()
@@ -35,10 +34,10 @@ function App() {
           genreId={genreId}
           sortKey={sortKey}
           direction={direction}
-          onGenreChange={setGenreId}
-          onSortKeyChange={setSortKey}
+          onGenreChange={(nextGenreId) => update({ genreId: nextGenreId })}
+          onSortKeyChange={(nextSortKey) => update({ sortKey: nextSortKey })}
           onDirectionToggle={() =>
-            setDirection((current) => (current === 'desc' ? 'asc' : 'desc'))
+            update({ direction: direction === 'desc' ? 'asc' : 'desc' })
           }
         />
 
