@@ -2,6 +2,9 @@ import { useMemo } from 'react'
 import Controls from './components/Controls.tsx'
 import MovieGrid from './components/MovieGrid.tsx'
 import Navbar from './components/Navbar.tsx'
+import EmptyState from './components/states/EmptyState.tsx'
+import ErrorState from './components/states/ErrorState.tsx'
+import SkeletonGrid from './components/states/SkeletonGrid.tsx'
 import { useGenres } from './hooks/useGenres.ts'
 import { useMovies } from './hooks/useMovies.ts'
 import { useViewState } from './hooks/useViewState.ts'
@@ -42,19 +45,25 @@ function App() {
         />
 
         <p className="sr-only" aria-live="polite">
-          {movies.status === 'success' && `${sorted.length} movies`}
+          {movies.status === 'loading' && 'Loading movies'}
+          {movies.status === 'error' && movies.error}
+          {movies.status === 'success' &&
+            (sorted.length === 0
+              ? 'No movies found'
+              : `${sorted.length} movies`)}
         </p>
 
         <main className="mt-8">
-          {movies.status === 'loading' && (
-            <p className="text-sm text-ink-muted">Loading movies...</p>
-          )}
+          {movies.status === 'loading' && <SkeletonGrid />}
           {movies.status === 'error' && (
-            <p className="text-sm text-red-400">{movies.error}</p>
+            <ErrorState message={movies.error} onRetry={movies.retry} />
           )}
-          {movies.status === 'success' && (
-            <MovieGrid movies={sorted} genresById={genres.genresById} />
-          )}
+          {movies.status === 'success' &&
+            (sorted.length === 0 ? (
+              <EmptyState />
+            ) : (
+              <MovieGrid movies={sorted} genresById={genres.genresById} />
+            ))}
         </main>
       </div>
     </div>
