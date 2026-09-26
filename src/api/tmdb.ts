@@ -1,3 +1,5 @@
+import type { SortDirection, SortKey } from '../lib/sortMovies.ts'
+import { toTmdbSortBy } from '../lib/sortMovies.ts'
 import type {
   DiscoverResponse,
   Genre,
@@ -5,6 +7,9 @@ import type {
   Movie,
   TmdbErrorResponse,
 } from '../types/tmdb.ts'
+
+/** TMDB refuses discover pages past 500 even when total_pages is larger. */
+export const TMDB_MAX_PAGE = 500
 
 const BASE_URL = 'https://api.themoviedb.org/3'
 
@@ -30,6 +35,14 @@ export interface DiscoverParams {
   genreId?: number | null
   minVoteCount?: number
   page?: number
+  sortKey?: SortKey
+  direction?: SortDirection
+}
+
+export interface DiscoverPage {
+  movies: Movie[]
+  page: number
+  totalPages: number
 }
 
 function apiKey(): string {
@@ -46,19 +59,21 @@ function apiKey(): string {
  * Built separately from the fetch so the query-string logic is unit-testable
  * without mocking the network.
  *
- * sort_by here is a *selection* criterion: it decides which 20 of ~760,000
- * results land on page 1. Display order is handled client-side by sortMovies.
+ * sort_by is sent to TMDB so page 2 continues the same ranking as page 1.
+ * sortMovies still reorders the current page as a display pass.
  */
 export function buildDiscoverUrl({
   genreId = null,
   minVoteCount = MIN_VOTE_COUNT,
   page = 1,
+  sortKey = 'vote_average',
+  direction = 'desc',
 }: DiscoverParams = {}): string {
   const url = new URL(`${BASE_URL}/discover/movie`)
   url.searchParams.set('api_key', apiKey())
   url.searchParams.set('language', 'en-US')
   url.searchParams.set('page', String(page))
-  url.searchParams.set('sort_by', 'popularity.desc')
+  url.searchParams.set('sort_by', toTmdbSortBy(sortKey, direction))
   url.searchParams.set('include_adult', 'false')
   url.searchParams.set('include_video', 'false')
   url.searchParams.set('vote_count.gte', String(minVoteCount))
@@ -99,12 +114,16 @@ async function tmdbFetch<T>(url: string, signal?: AbortSignal): Promise<T> {
 export async function fetchDiscoverMovies(
   params: DiscoverParams = {},
   signal?: AbortSignal,
-): Promise<Movie[]> {
+): Promise<DiscoverPage> {
   const data = await tmdbFetch<DiscoverResponse>(
     buildDiscoverUrl(params),
     signal,
   )
-  return data.results
+  return {
+    movies: data.results,
+    page: data.page,
+    totalPages: Math.min(data.total_pages, TMDB_MAX_PAGE),
+  }
 }
 
 export async function fetchGenres(signal?: AbortSignal): Promise<Genre[]> {

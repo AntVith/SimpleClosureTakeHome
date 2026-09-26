@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import Controls from './components/Controls.tsx'
 import MovieGrid from './components/MovieGrid.tsx'
 import Navbar from './components/Navbar.tsx'
+import Pagination from './components/Pagination.tsx'
 import EmptyState from './components/states/EmptyState.tsx'
 import ErrorState from './components/states/ErrorState.tsx'
 import SkeletonGrid from './components/states/SkeletonGrid.tsx'
@@ -12,37 +13,61 @@ import { sortMovies } from './lib/sortMovies.ts'
 
 function App() {
   const { state, update } = useViewState()
-  const { genreId, sortKey, direction } = state
+  const { genreId, sortKey, direction, page } = state
 
-  const movies = useMovies(genreId)
+  const movies = useMovies({ genreId, sortKey, direction, page })
   const genres = useGenres()
 
-  // Held separately from `movies` so the memo key is the results array itself,
-  // which is stable across renders, rather than the hook's wrapper object.
-  const results = movies.status === 'success' ? movies.data : null
+  const results = movies.status === 'success' ? movies.data.movies : null
 
   const sorted = useMemo(
     () => (results ? sortMovies(results, sortKey, direction) : []),
     [results, sortKey, direction],
   )
 
+  const showPager =
+    movies.status === 'success' &&
+    movies.data.totalPages > 1 &&
+    sorted.length > 0
+
+  function goToPage(nextPage: number) {
+    update({ page: nextPage })
+  }
+
   return (
     <div className="min-h-dvh">
       <Navbar />
 
       <div className="mx-auto max-w-7xl px-6 py-8">
-        <Controls
-          genres={genres.status === 'success' ? genres.data : []}
-          genresUnavailable={genres.status === 'error'}
-          genreId={genreId}
-          sortKey={sortKey}
-          direction={direction}
-          onGenreChange={(nextGenreId) => update({ genreId: nextGenreId })}
-          onSortKeyChange={(nextSortKey) => update({ sortKey: nextSortKey })}
-          onDirectionToggle={() =>
-            update({ direction: direction === 'desc' ? 'asc' : 'desc' })
-          }
-        />
+        <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
+          <Controls
+            genres={genres.status === 'success' ? genres.data : []}
+            genresUnavailable={genres.status === 'error'}
+            genreId={genreId}
+            sortKey={sortKey}
+            direction={direction}
+            onGenreChange={(nextGenreId) =>
+              update({ genreId: nextGenreId, page: 1 })
+            }
+            onSortKeyChange={(nextSortKey) =>
+              update({ sortKey: nextSortKey, page: 1 })
+            }
+            onDirectionToggle={() =>
+              update({
+                direction: direction === 'desc' ? 'asc' : 'desc',
+                page: 1,
+              })
+            }
+          />
+          {showPager && (
+            <Pagination
+              page={page}
+              totalPages={movies.data.totalPages}
+              onPageChange={goToPage}
+              className="self-end sm:mb-0.5"
+            />
+          )}
+        </div>
 
         <p className="sr-only" aria-live="polite">
           {movies.status === 'loading' && 'Loading movies'}
@@ -50,7 +75,7 @@ function App() {
           {movies.status === 'success' &&
             (sorted.length === 0
               ? 'No movies found'
-              : `${sorted.length} movies`)}
+              : `${page} of ${movies.data.totalPages}, ${sorted.length} movies`)}
         </p>
 
         <main className="mt-8">
@@ -62,7 +87,18 @@ function App() {
             (sorted.length === 0 ? (
               <EmptyState />
             ) : (
-              <MovieGrid movies={sorted} genresById={genres.genresById} />
+              <>
+                <MovieGrid movies={sorted} genresById={genres.genresById} />
+                {showPager && (
+                  <Pagination
+                    page={page}
+                    totalPages={movies.data.totalPages}
+                    onPageChange={goToPage}
+                    scrollOnChange
+                    className="mt-10 justify-center"
+                  />
+                )}
+              </>
             ))}
         </main>
       </div>

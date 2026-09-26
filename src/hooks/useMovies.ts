@@ -1,65 +1,68 @@
 import { useCallback, useEffect, useState } from 'react'
 import { fetchDiscoverMovies } from '../api/tmdb.ts'
+import type { DiscoverPage, DiscoverParams } from '../api/tmdb.ts'
 import type { AsyncState } from '../lib/asyncState.ts'
 import { errorMessage } from '../lib/errors.ts'
-import type { Movie } from '../types/tmdb.ts'
 
-export type UseMoviesResult = AsyncState<Movie[]> & { retry: () => void }
+export type UseMoviesResult = AsyncState<DiscoverPage> & { retry: () => void }
 
-/** The request a stored result belongs to, so stale results can be ignored. */
 interface Snapshot {
-  genreId: number | null
+  request: DiscoverParams
   attempt: number
-  state: AsyncState<Movie[]>
+  state: AsyncState<DiscoverPage>
 }
 
-/**
- * Refetches whenever the genre changes. Kept separate from useGenres because
- * the two have different lifecycles: this one is driven by user input, the
- * genre list is fetched once.
- */
-export function useMovies(genreId: number | null): UseMoviesResult {
+function sameRequest(left: DiscoverParams, right: DiscoverParams): boolean {
+  return (
+    left.genreId === right.genreId &&
+    left.page === right.page &&
+    left.sortKey === right.sortKey &&
+    left.direction === right.direction
+  )
+}
+
+export function useMovies(request: DiscoverParams): UseMoviesResult {
+  const { genreId = null, page = 1, sortKey = 'vote_average', direction = 'desc' } =
+    request
+  const currentRequest: DiscoverParams = { genreId, page, sortKey, direction }
+
   const [attempt, setAttempt] = useState(0)
   const [snapshot, setSnapshot] = useState<Snapshot>({
-    genreId,
+    request: currentRequest,
     attempt,
     state: { status: 'loading' },
   })
 
-  // A snapshot from a previous genre is stale, so loading is derived here
-  // during render rather than assigned from inside the effect, which would
-  // queue an extra render pass on every filter change.
-  const isCurrent = snapshot.genreId === genreId && snapshot.attempt === attempt
-  const state: AsyncState<Movie[]> = isCurrent
+  const isCurrent =
+    sameRequest(snapshot.request, currentRequest) && snapshot.attempt === attempt
+  const state: AsyncState<DiscoverPage> = isCurrent
     ? snapshot.state
     : { status: 'loading' }
 
   useEffect(() => {
     const controller = new AbortController()
+    const nextRequest: DiscoverParams = { genreId, page, sortKey, direction }
 
-    fetchDiscoverMovies({ genreId }, controller.signal)
-      .then((movies) => {
+    fetchDiscoverMovies(nextRequest, controller.signal)
+      .then((result) => {
         if (controller.signal.aborted) return
         setSnapshot({
-          genreId,
+          request: nextRequest,
           attempt,
-          state: { status: 'success', data: movies },
+          state: { status: 'success', data: result },
         })
       })
       .catch((error: unknown) => {
-        // A superseded request is our own doing, so it must not surface as an
-        // error or every filter change would flash a failure state. Checking
-        // the signal avoids sniffing at DOMException shapes.
         if (controller.signal.aborted) return
         setSnapshot({
-          genreId,
+          request: nextRequest,
           attempt,
           state: { status: 'error', error: errorMessage(error) },
         })
       })
 
     return () => controller.abort()
-  }, [genreId, attempt])
+  }, [genreId, page, sortKey, direction, attempt])
 
   const retry = useCallback(() => {
     setAttempt((count) => count + 1)

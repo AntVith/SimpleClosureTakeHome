@@ -40,6 +40,18 @@ export function isSortDirection(value: unknown): value is SortDirection {
   return value === 'asc' || value === 'desc'
 }
 
+const TMDB_SORT_FIELD: Record<SortKey, string> = {
+  vote_average: 'vote_average',
+  popularity: 'popularity',
+  release_date: 'primary_release_date',
+  title: 'title',
+}
+
+/** Maps our sort controls onto TMDB's sort_by so each page continues that order. */
+export function toTmdbSortBy(key: SortKey, direction: SortDirection): string {
+  return `${TMDB_SORT_FIELD[key]}.${direction}`
+}
+
 /**
  * TMDB sends an empty release_date for unscheduled titles, and Date.parse('')
  * is NaN. A NaN comparator result silently corrupts the whole sort, so unknown
