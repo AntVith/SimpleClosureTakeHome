@@ -1,39 +1,35 @@
+import MovieGrid from './components/MovieGrid.tsx'
 import { useGenres } from './hooks/useGenres.ts'
 import { useMovies } from './hooks/useMovies.ts'
 
 function App() {
   const movies = useMovies(null)
-  const genres = useGenres()
+  const { genresById } = useGenres()
 
   return (
     <div className="min-h-dvh">
-      <header className="mx-auto max-w-7xl px-6 py-12">
-        <h1 className="text-3xl font-semibold tracking-tight">
-          Movie Discovery
-        </h1>
-        <p className="mt-2 text-ink-muted">
-          Browsing movies from The Movie Database.
-        </p>
+      <div className="mx-auto max-w-7xl px-6 py-10">
+        <header>
+          <h1 className="text-3xl font-semibold tracking-tight">
+            Movie Discovery
+          </h1>
+          <p className="mt-2 text-ink-muted">
+            Browsing movies from The Movie Database.
+          </p>
+        </header>
 
-        <dl className="mt-8 space-y-1 text-sm text-ink-muted">
-          <div>
-            <dt className="inline font-medium text-ink">movies: </dt>
-            <dd className="inline">
-              {movies.status === 'loading' && 'loading'}
-              {movies.status === 'success' && `${movies.data.length} results`}
-              {movies.status === 'error' && movies.error}
-            </dd>
-          </div>
-          <div>
-            <dt className="inline font-medium text-ink">genres: </dt>
-            <dd className="inline">
-              {genres.status === 'loading' && 'loading'}
-              {genres.status === 'success' && `${genres.data.length} available`}
-              {genres.status === 'error' && genres.error}
-            </dd>
-          </div>
-        </dl>
-      </header>
+        <main className="mt-8">
+          {movies.status === 'loading' && (
+            <p className="text-sm text-ink-muted">Loading movies...</p>
+          )}
+          {movies.status === 'error' && (
+            <p className="text-sm text-red-400">{movies.error}</p>
+          )}
+          {movies.status === 'success' && (
+            <MovieGrid movies={movies.data} genresById={genresById} />
+          )}
+        </main>
+      </div>
     </div>
   )
 }
